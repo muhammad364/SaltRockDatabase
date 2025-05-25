@@ -1,0 +1,147 @@
+DROP DATABASE IF EXISTS SaltRock;
+CREATE DATABASE SaltRock
+  /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */;
+USE SaltRock;
+
+-- Create User table
+CREATE TABLE User (
+  USER_ID     INT            NOT NULL AUTO_INCREMENT,
+  username    VARCHAR(50)    NOT NULL,
+  email       VARCHAR(100)   NOT NULL,
+  PRIMARY KEY (USER_ID),
+  UNIQUE KEY (email)
+) ENGINE=InnoDB;
+
+-- Create Genre table
+CREATE TABLE Genre (
+  GENRE_ID    INT            NOT NULL AUTO_INCREMENT,
+  genre_name  VARCHAR(50)    NOT NULL,
+  PRIMARY KEY (GENRE_ID),
+  UNIQUE KEY (genre_name)
+) ENGINE=InnoDB;
+
+-- Create User_Genre associative table
+CREATE TABLE User_Genre (
+  USER_ID   INT NOT NULL,
+  GENRE_ID  INT NOT NULL,
+  PRIMARY KEY (USER_ID, GENRE_ID),
+  FOREIGN KEY (USER_ID) REFERENCES User(USER_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (GENRE_ID) REFERENCES Genre(GENRE_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- Create Act table
+CREATE TABLE Act (
+  ACT_ID     INT             NOT NULL AUTO_INCREMENT,
+  act_name   VARCHAR(100)    NOT NULL,
+  gig_rate   DECIMAL(6,2)    NOT NULL,
+  is_solo    BOOLEAN         NOT NULL DEFAULT FALSE,
+  PRIMARY KEY (ACT_ID),
+  UNIQUE KEY (act_name)
+) ENGINE=InnoDB;
+
+-- Create Act_Member table
+CREATE TABLE Act_Member (
+  MEMBER_ID   INT          NOT NULL AUTO_INCREMENT,
+  first_name  VARCHAR(50)  NOT NULL,
+  last_name   VARCHAR(50)  NOT NULL,
+  ACT_ID      INT          NOT NULL,
+  PRIMARY KEY (MEMBER_ID),
+  FOREIGN KEY (ACT_ID) REFERENCES Act(ACT_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- Create Act_Genre associative table
+CREATE TABLE Act_Genre (
+  ACT_ID    INT NOT NULL,
+  GENRE_ID  INT NOT NULL,
+  PRIMARY KEY (ACT_ID, GENRE_ID),
+  FOREIGN KEY (ACT_ID) REFERENCES Act(ACT_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (GENRE_ID) REFERENCES Genre(GENRE_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- Create Song table
+CREATE TABLE Song (
+  SONG_ID     INT          NOT NULL AUTO_INCREMENT,
+  title       VARCHAR(100) NOT NULL,
+  length      TIME         NOT NULL,
+  year        YEAR         NOT NULL,
+  lyrics      TEXT         NOT NULL,
+  plays       INT          NOT NULL DEFAULT 0,
+  ACT_ID      INT          NOT NULL,
+  PRIMARY KEY (SONG_ID),
+  FOREIGN KEY (ACT_ID) REFERENCES Act(ACT_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- Create Song_Genre associative table
+CREATE TABLE Song_Genre (
+  SONG_ID   INT NOT NULL,
+  GENRE_ID  INT NOT NULL,
+  PRIMARY KEY (SONG_ID, GENRE_ID),
+  FOREIGN KEY (SONG_ID) REFERENCES Song(SONG_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (GENRE_ID) REFERENCES Genre(GENRE_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- Create Venue table
+CREATE TABLE Venue (
+  VENUE_ID    INT          NOT NULL AUTO_INCREMENT,
+  venue_name  VARCHAR(100) NOT NULL,
+  max_fee     DECIMAL(7,2) NOT NULL,
+  PRIMARY KEY (VENUE_ID),
+  UNIQUE KEY (venue_name)
+) ENGINE=InnoDB;
+
+-- Create Gig_Booking table
+CREATE TABLE Gig_Booking (
+  BOOKING_ID   INT          NOT NULL AUTO_INCREMENT,
+  ACT_ID       INT          NOT NULL,
+  VENUE_ID     INT          NOT NULL,
+  start_time   TIME         NOT NULL,
+  end_time     TIME         NOT NULL,
+  total_cost   DECIMAL(8,2) NOT NULL DEFAULT 0,
+  PRIMARY KEY (BOOKING_ID),
+  FOREIGN KEY (ACT_ID)   REFERENCES Act(ACT_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (VENUE_ID) REFERENCES Venue(VENUE_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CHECK (end_time > start_time)
+) ENGINE=InnoDB;
+
+
+-- Triggers to auto-calc total_cost
+DELIMITER $$
+
+CREATE TRIGGER trg_calc_total_cost_before_insert
+BEFORE INSERT ON Gig_Booking
+FOR EACH ROW
+BEGIN
+  DECLARE rate DECIMAL(6,2);
+  SELECT gig_rate INTO rate
+    FROM Act
+    WHERE ACT_ID = NEW.ACT_ID;
+  SET NEW.total_cost =
+    TIMESTAMPDIFF(HOUR, NEW.start_time, NEW.end_time)
+    * rate;
+END$$
+
+CREATE TRIGGER trg_calc_total_cost_before_update
+BEFORE UPDATE ON Gig_Booking
+FOR EACH ROW
+BEGIN
+  DECLARE rate DECIMAL(6,2);
+  SELECT gig_rate INTO rate
+    FROM Act
+    WHERE ACT_ID = NEW.ACT_ID;
+  SET NEW.total_cost =
+    TIMESTAMPDIFF(HOUR, NEW.start_time, NEW.end_time)
+    * rate;
+END$$
+
+DELIMITER ;
+
